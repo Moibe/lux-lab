@@ -11,7 +11,8 @@
     { href: '/veo3.1', label: 'Veo 3.1', icon: '🎥' },
     { href: '/hailuo-02', label: 'Hailuo-02', icon: '⚡' },
     { href: '/ltx-2.3', label: 'LTX-2.3', icon: '🎞️' },
-    { href: '/omnihuman', label: 'Omnihuman', icon: '🗣️' }
+    { href: '/omnihuman', label: 'Omnihuman', icon: '🗣️' },
+    { href: '/flux', label: 'Flux', icon: '🖼️' }
   ];
 </script>
 
