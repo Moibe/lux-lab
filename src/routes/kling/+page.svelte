@@ -11,6 +11,10 @@
     { href: '/kling/v2.5', label: 'v2.5' },
     { href: '/kling/v2.1', label: 'v2.1' }
   ];
+
+  const utilities = [
+    { href: '/kling/create-voice', label: '🎙️ Create Voice' }
+  ];
 </script>
 
 <BackButton />
@@ -28,8 +32,22 @@
   {/each}
 </nav>
 
+<nav
+  class="pill-nav subnav utilities"
+  role="tablist"
+  in:fly={{ y: 60, duration: 700, delay: 1050, easing: expoOut }}
+  out:fly={{ y: 60, duration: 400, easing: cubicIn }}
+>
+  {#each utilities as u}
+    <a href={u.href} role="tab">{u.label}</a>
+  {/each}
+</nav>
+
 <style>
   .subnav {
     margin-top: 2rem;
+  }
+  .utilities {
+    margin-top: 1rem;
   }
 </style>
