@@ -1,5 +1,5 @@
 <script lang="ts">
-  import NanoBananaEdit from '$lib/forms/NanoBananaEdit.svelte';
+  import NanoBanana2Edit from '$lib/forms/NanoBanana2Edit.svelte';
 </script>
 
-<NanoBananaEdit />
+<NanoBanana2Edit />

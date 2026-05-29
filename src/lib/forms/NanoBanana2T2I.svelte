@@ -1,51 +1,51 @@
 <script lang="ts">
-  import { fly, fade, slide } from 'svelte/transition';
+  import { fly, fade } from 'svelte/transition';
   import { cubicIn, expoOut } from 'svelte/easing';
   import { dramaticIn, dramaticOut } from '$lib/transitions';
   import BackButton from '$lib/BackButton.svelte';
+  import Switch from '$lib/form/Switch.svelte';
   import Slider from '$lib/form/Slider.svelte';
   import Collapsible from '$lib/form/Collapsible.svelte';
   import CostEstimate from '$lib/form/CostEstimate.svelte';
   import StatusPanel from '$lib/form/StatusPanel.svelte';
   import Prompt from '$lib/form/Prompt.svelte';
   import ChipGroup from '$lib/form/ChipGroup.svelte';
-  import ImageSlot, { type ImageSlotState } from '$lib/form/ImageSlot.svelte';
   import {
-    NANO_BANANA_EDIT_ASPECT_RATIOS,
-    NANO_BANANA_OUTPUT_FORMATS,
-    NANO_BANANA_SAFETY_TOLERANCES,
-    NANO_BANANA_DEFAULTS,
-    type NanoBananaEditAspectRatio,
-    type NanoBananaOutputFormat,
-    type NanoBananaSafetyTolerance,
-    type NanoBananaEditBody
+    NANO_BANANA_2_ASPECT_RATIOS,
+    NANO_BANANA_2_RESOLUTIONS,
+    NANO_BANANA_2_OUTPUT_FORMATS,
+    NANO_BANANA_2_SAFETY_TOLERANCES,
+    NANO_BANANA_2_THINKING_LEVELS,
+    NANO_BANANA_2_DEFAULTS,
+    type NanoBanana2AspectRatio,
+    type NanoBanana2Resolution,
+    type NanoBanana2OutputFormat,
+    type NanoBanana2SafetyTolerance,
+    type NanoBanana2ThinkingLevel,
+    type NanoBanana2T2IBody
   } from '@moibe/falai-nucleo';
   import { fetchPriceMap, type PriceMap } from '$lib/cost';
 
-  type Phase = 'idle' | 'uploading' | 'submitting' | 'polling' | 'done' | 'error';
+  type Phase = 'idle' | 'submitting' | 'polling' | 'done' | 'error';
 
-  const ENDPOINT_ID = 'fal-ai/nano-banana/edit';
-  const MAX_IMAGES = 6;
+  const ENDPOINT_ID = 'fal-ai/nano-banana-2';
   const MAX_POLLS = 300;
   const FAILURE_STATUSES = new Set(['FAILED', 'ERROR', 'CANCELLED', 'CANCELED']);
   const IN_PROGRESS_STATUSES = new Set(['IN_QUEUE', 'IN_PROGRESS', 'PENDING']);
 
-  function emptyImage(): ImageSlotState {
-    return { file: null, preview: null, url: null };
-  }
-  function hasContent(s: ImageSlotState): boolean {
-    return !!(s.file || s.url);
-  }
-
-  let images = $state<ImageSlotState[]>([emptyImage()]);
   let prompt = $state('');
-  let aspectRatio = $state<NanoBananaEditAspectRatio>(NANO_BANANA_DEFAULTS.edit_aspect_ratio);
-  let numImages = $state<number>(NANO_BANANA_DEFAULTS.num_images);
-  let outputFormat = $state<NanoBananaOutputFormat>(NANO_BANANA_DEFAULTS.output_format);
-  let safetyTolerance = $state<NanoBananaSafetyTolerance>(NANO_BANANA_DEFAULTS.safety_tolerance);
+  let systemPrompt = $state('');
+  let aspectRatio = $state<NanoBanana2AspectRatio>(NANO_BANANA_2_DEFAULTS.aspect_ratio);
+  let resolution = $state<NanoBanana2Resolution>(NANO_BANANA_2_DEFAULTS.resolution);
+  let thinkingLevel = $state<NanoBanana2ThinkingLevel>('minimal');
+  let enableWebSearch = $state(false);
+  let numImages = $state<number>(NANO_BANANA_2_DEFAULTS.num_images);
+  let outputFormat = $state<NanoBanana2OutputFormat>(NANO_BANANA_2_DEFAULTS.output_format);
+  let safetyTolerance = $state<NanoBanana2SafetyTolerance>(NANO_BANANA_2_DEFAULTS.safety_tolerance);
+  let limitGenerations = $state<boolean>(NANO_BANANA_2_DEFAULTS.limit_generations);
   let seed = $state<string>('');
   let advancedOpen = $state(false);
-  let tipsOpen = $state(false);
+  let systemOpen = $state(false);
 
   let phase = $state<Phase>('idle');
   let logs = $state<string[]>([]);
@@ -54,14 +54,11 @@
   let errorMessage = $state<string | null>(null);
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const isRunning = $derived(
-    phase === 'uploading' || phase === 'submitting' || phase === 'polling'
-  );
+  const isRunning = $derived(phase === 'submitting' || phase === 'polling');
   const phaseLabel: Record<Phase, string> = {
     idle: '',
-    uploading: 'Subiendo imágenes...',
     submitting: 'Enviando trabajo...',
-    polling: 'Aplicando edit...',
+    polling: 'Generando imagen...',
     done: '¡Listo!',
     error: 'Error'
   };
@@ -72,40 +69,14 @@
   });
   const unitPrice = $derived(priceMap[ENDPOINT_ID]?.unit_price ?? null);
 
-  const aspectOptions = NANO_BANANA_EDIT_ASPECT_RATIOS.map((v) => ({ value: v, label: v }));
-  const formatOptions = NANO_BANANA_OUTPUT_FORMATS.map((v) => ({ value: v, label: v.toUpperCase() }));
-  const safetyOptions = NANO_BANANA_SAFETY_TOLERANCES.map((v) => ({ value: v, label: v }));
-
-  // Sugerencias de prompt-helpers según la doc oficial.
-  const promptSnippets = [
-    { label: 'Keep identical', text: ' Keep everything else identical.' },
-    { label: 'Remove…', text: 'Remove the ' },
-    { label: 'Add…', text: 'Add a ' },
-    { label: 'Replace…', text: 'Replace the ' },
-    { label: 'Swap with ref', text: 'Replace the garment with the one shown in the second image. ' }
-  ];
-
-  function appendSnippet(text: string) {
-    prompt = (prompt + text).replace(/\s{2,}/g, ' ').trimStart();
-  }
-
-  function addImage() {
-    if (images.length < MAX_IMAGES) images = [...images, emptyImage()];
-  }
-  function removeImage(i: number) {
-    if (images[i].preview) URL.revokeObjectURL(images[i].preview!);
-    images = images.filter((_, idx) => idx !== i);
-    if (images.length === 0) images = [emptyImage()];
-  }
-
-  async function uploadFile(file: File): Promise<string> {
-    const fd = new FormData();
-    fd.append('file', file);
-    const res = await fetch('/api/upload', { method: 'POST', body: fd });
-    if (!res.ok) throw new Error(`Upload falló: ${await res.text()}`);
-    const { url } = await res.json();
-    return url;
-  }
+  const aspectOptions = NANO_BANANA_2_ASPECT_RATIOS.map((v) => ({ value: v, label: v }));
+  const resolutionOptions = NANO_BANANA_2_RESOLUTIONS.map((v) => ({ value: v, label: v }));
+  const thinkingOptions = NANO_BANANA_2_THINKING_LEVELS.map((v) => ({
+    value: v,
+    label: v === 'high' ? 'High (mejor calidad)' : 'Minimal (rápido)'
+  }));
+  const formatOptions = NANO_BANANA_2_OUTPUT_FORMATS.map((v) => ({ value: v, label: v.toUpperCase() }));
+  const safetyOptions = NANO_BANANA_2_SAFETY_TOLERANCES.map((v) => ({ value: v, label: v }));
 
   function reset() {
     if (pollTimer) {
@@ -118,16 +89,21 @@
     errorMessage = null;
   }
 
-  function buildPayload(imageUrls: string[], seedValue: number | null): NanoBananaEditBody {
-    return {
+  function buildPayload(seedValue: number | null): NanoBanana2T2IBody {
+    const body: NanoBanana2T2IBody = {
       prompt: prompt.trim(),
-      image_urls: imageUrls,
       aspect_ratio: aspectRatio,
+      resolution,
       num_images: numImages,
       output_format: outputFormat,
       safety_tolerance: safetyTolerance,
-      ...(seedValue !== null ? { seed: seedValue } : {})
+      thinking_level: thinkingLevel,
+      enable_web_search: enableWebSearch,
+      limit_generations: limitGenerations
     };
+    if (systemPrompt.trim()) body.system_prompt = systemPrompt.trim();
+    if (seedValue !== null) body.seed = seedValue;
+    return body;
   }
 
   async function handleSubmit(e: Event) {
@@ -135,40 +111,19 @@
     if (phase !== 'idle' && phase !== 'done' && phase !== 'error') return;
 
     if (!prompt.trim()) {
-      errorMessage = 'Escribe la instrucción del edit.';
-      phase = 'error';
-      return;
-    }
-    if (images.filter(hasContent).length === 0) {
-      errorMessage = 'Sube al menos 1 imagen.';
+      errorMessage = 'Escribe un prompt.';
       phase = 'error';
       return;
     }
 
     reset();
     try {
-      phase = 'uploading';
-      for (let i = 0; i < images.length; i++) {
-        const img = images[i];
-        if (!img.url && img.file) {
-          images[i] = { ...img, url: await uploadFile(img.file) };
-        }
-      }
-      const imageUrls = images
-        .filter((img) => img.url)
-        .map((img) => img.url!);
-      if (imageUrls.length === 0) {
-        errorMessage = 'No se pudo subir ninguna imagen.';
-        phase = 'error';
-        return;
-      }
-
       const seedNum = parseInt(seed, 10);
       const seedValue = !isNaN(seedNum) && seedNum >= 0 ? seedNum : null;
-      const payload = buildPayload(imageUrls, seedValue);
+      const payload = buildPayload(seedValue);
 
       phase = 'submitting';
-      const subRes = await fetch('/api/nano-banana/edit/submit', {
+      const subRes = await fetch('/api/nano-banana-2/t2i/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -185,7 +140,7 @@
           return;
         }
         const r = await fetch(
-          `/api/nano-banana/edit/status?id=${encodeURIComponent(request_id)}`
+          `/api/nano-banana-2/t2i/status?id=${encodeURIComponent(request_id)}`
         );
         if (!r.ok) throw new Error(`Status falló: ${await r.text()}`);
         const data = await r.json();
@@ -237,21 +192,18 @@
 
   $effect(() => () => {
     if (pollTimer) clearTimeout(pollTimer);
-    images.forEach((img) => {
-      if (img.preview) URL.revokeObjectURL(img.preview);
-    });
   });
 </script>
 
-<BackButton href="/nano-banana/legacy" label="Nano Banana legacy" />
+<BackButton href="/nano-banana" label="Nano Banana" />
 
 <h1 class="title page-title" in:dramaticIn={{ delay: 500 }} out:dramaticOut={{}}>
-  Nano Banana - Edit
+  Nano Banana 2 - Text to Image
 </h1>
 
 <p class="lede" in:fade={{ delay: 750, duration: 400 }} out:fade={{ duration: 200 }}>
-  Edits quirúrgicos por instrucción: <em>remove / add / swap</em> sin máscaras.
-  Sube 1+ imágenes y describe el cambio.
+  State-of-the-art de Google Gemini para T2I. Resoluciones hasta 4K, web search
+  para referencias actuales y aspect ratios panorámicos.
 </p>
 
 <form
@@ -260,67 +212,54 @@
   in:fly={{ y: 40, duration: 700, delay: 900, easing: expoOut }}
   out:fly={{ y: 40, duration: 400, easing: cubicIn }}
 >
-  <div class="field">
-    <span class="field-label">
-      Imágenes ({images.filter(hasContent).length}/{MAX_IMAGES})
-      <small class="muted">— la primera es el sujeto; las demás funcionan como referencia (ej. una prenda a colocar)</small>
-    </span>
-    <div class="multi-grid">
-      {#each images as img, i (i)}
-        <div class="ref-card" transition:slide={{ duration: 200, axis: 'x' }}>
-          <span class="ref-tag">{i === 0 ? 'subject' : `ref${i}`}</span>
-          <ImageSlot
-            bind:state={images[i]}
-            disabled={isRunning}
-            placeholder={i === 0 ? 'Imagen base' : `Referencia ${i}`}
-            minHeight="9rem"
-          />
-          {#if images.length > 1 || img.file || img.url}
-            <button
-              type="button"
-              class="ref-remove"
-              aria-label={`Quitar imagen ${i + 1}`}
-              disabled={isRunning}
-              onclick={() => removeImage(i)}
-            >×</button>
-          {/if}
-        </div>
-      {/each}
-      {#if images.length < MAX_IMAGES}
-        <button
-          type="button"
-          class="add-card"
-          onclick={addImage}
-          disabled={isRunning}
-        >+ Imagen</button>
-      {/if}
-    </div>
-  </div>
+  <ChipGroup
+    bind:value={aspectRatio}
+    options={aspectOptions}
+    label="Aspect ratio:"
+    disabled={isRunning}
+  />
+
+  <ChipGroup
+    bind:value={resolution}
+    options={resolutionOptions}
+    label="Resolución:"
+    disabled={isRunning}
+  />
 
   <Prompt
     bind:value={prompt}
-    placeholder='Ej. "Remove the black belt around the waist. Keep everything else identical."'
+    placeholder="Describe la imagen que quieres generar..."
     rows={6}
     maxlength={5000}
     disabled={isRunning}
   />
 
-  <div class="snippets">
-    <span class="snippets-label">Insertar:</span>
-    {#each promptSnippets as s}
-      <button
-        type="button"
-        class="chip"
-        disabled={isRunning}
-        onclick={() => appendSnippet(s.text)}
-      >{s.label}</button>
-    {/each}
+  <Collapsible bind:open={systemOpen} title="🎨 System prompt (estilo / persona reutilizable)">
+    <Prompt
+      bind:value={systemPrompt}
+      placeholder='Ej. "Cinematic photography, soft natural lighting, shallow depth of field"'
+      rows={3}
+      maxlength={2000}
+      small
+      disabled={isRunning}
+    />
+  </Collapsible>
+
+  <div class="field">
+    <span class="field-label">Thinking level</span>
+    <ChipGroup
+      bind:value={thinkingLevel}
+      options={thinkingOptions}
+      disabled={isRunning}
+    />
+    <small class="hint">
+      <strong>High</strong> cuesta más cómputo pero da mejores resultados en escenas complejas.
+    </small>
   </div>
 
-  <ChipGroup
-    bind:value={aspectRatio}
-    options={aspectOptions}
-    label="Aspect ratio:"
+  <Switch
+    bind:checked={enableWebSearch}
+    label="🌐 Web search (referencias actuales: marcas, eventos, personas conocidas)"
     disabled={isRunning}
   />
 
@@ -331,15 +270,6 @@
     label="Número de imágenes"
     disabled={isRunning}
   />
-
-  <Collapsible bind:open={tipsOpen} title="💡 Tips para edits efectivos (Google)">
-    <ul class="tips">
-      <li>Frases tipo <em>"Keep everything else identical"</em> evitan cambios colaterales.</li>
-      <li>Describe la prenda con detalle: <em>"a brown leather jacket, slim fit"</em> &gt; <em>"a jacket"</em>.</li>
-      <li>Para remove, identifica el objeto sin ambigüedad: <em>"remove the black belt around the waist"</em> &gt; <em>"remove the belt"</em>.</li>
-      <li>Para swap con referencia: <em>"Replace the garment with the one shown in the second image"</em>.</li>
-    </ul>
-  </Collapsible>
 
   <Collapsible bind:open={advancedOpen} title="Avanzado">
     <div class="field">
@@ -358,6 +288,11 @@
         disabled={isRunning}
       />
     </div>
+    <Switch
+      bind:checked={limitGenerations}
+      label="Limit generations (cap defensivo del backend)"
+      disabled={isRunning}
+    />
     <div class="field">
       <label class="field-label" for="seed">Seed (opcional)</label>
       <input
@@ -376,7 +311,7 @@
   <CostEstimate {unitPrice} duration={numImages} />
 
   <button class="submit" type="submit" disabled={isRunning}>
-    {isRunning ? phaseLabel[phase] : 'Aplicar edit'}
+    {isRunning ? phaseLabel[phase] : 'Generar'}
   </button>
 
   <StatusPanel
@@ -433,115 +368,10 @@
     color: var(--text-secondary);
     font-size: 0.9rem;
   }
-  .muted {
+  .hint {
     color: var(--text-muted);
-    font-weight: 400;
-  }
-  .multi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
-    gap: 0.75rem;
-  }
-  .ref-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-  .ref-tag {
-    align-self: flex-start;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  .ref-remove {
-    position: absolute;
-    top: 1.7rem;
-    right: 0.35rem;
-    width: 1.6rem;
-    height: 1.6rem;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.65);
-    color: #fff;
-    border: none;
-    font-size: 1rem;
-    cursor: pointer;
-    line-height: 1;
-    z-index: 2;
-  }
-  .ref-remove:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-  .add-card {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 9rem;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px dashed rgba(255, 255, 255, 0.18);
-    border-radius: var(--radius-card);
-    color: var(--text-muted);
-    font-family: var(--font-sans);
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: border-color var(--transition-fast), color var(--transition-fast);
-  }
-  .add-card:hover:not(:disabled) {
-    border-color: rgba(255, 255, 255, 0.35);
-    color: var(--text-primary);
-  }
-  .add-card:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .snippets {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem;
-    margin-top: -0.4rem;
-  }
-  .snippets-label {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    margin-right: 0.2rem;
-  }
-  .chip {
-    padding: 0.3rem 0.7rem;
-    background: rgba(255, 255, 255, 0.06);
-    border: var(--border-subtle);
-    border-radius: 999px;
-    color: var(--text-secondary);
-    font-family: var(--font-sans);
     font-size: 0.78rem;
-    cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast);
   }
-  .chip:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.12);
-    color: var(--text-primary);
-  }
-  .chip:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .tips {
-    margin: 0;
-    padding-left: 1.1rem;
-    color: var(--text-secondary);
-    font-size: 0.85rem;
-    line-height: 1.55;
-  }
-  .tips li {
-    margin: 0.25rem 0;
-  }
-
   .seed-input {
     background: rgba(255, 255, 255, 0.04);
     border: var(--border-subtle);

@@ -174,7 +174,7 @@
   });
 </script>
 
-<BackButton href="/nano-banana" label="Nano Banana" />
+<BackButton href="/nano-banana/legacy" label="Nano Banana legacy" />
 
 <h1 class="title page-title" in:dramaticIn={{ delay: 500 }} out:dramaticOut={{}}>
   Nano Banana - Text to Image

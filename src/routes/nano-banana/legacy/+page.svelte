@@ -5,20 +5,20 @@
   import BackButton from '$lib/BackButton.svelte';
 
   const modes = [
-    { href: '/nano-banana/edit', label: 'Edit', hint: 'Remove / add / swap quirúrgico' },
-    { href: '/nano-banana/t2i', label: 'T2I', hint: 'Text → Image state-of-the-art' }
+    { href: '/nano-banana/legacy/edit', label: 'Edit', hint: 'v1 Remove / add / swap' },
+    { href: '/nano-banana/legacy/t2i', label: 'T2I', hint: 'v1 Text → Image' }
   ];
 </script>
 
-<BackButton />
+<BackButton href="/nano-banana" label="Nano Banana" />
 
 <h1 class="title" in:dramaticIn={{ delay: 500 }} out:dramaticOut={{}}>
-  Nano Banana 2 <span class="v-tag">v2</span>
+  Nano Banana <span class="legacy-tag">legacy v1</span>
 </h1>
 
 <p class="lede" in:fade={{ delay: 750, duration: 400 }} out:fade={{ duration: 200 }}>
-  State-of-the-art de Google Gemini para image gen + edit. Resolución hasta 4K,
-  thinking step, web search y aspect ratios panorámicos (4:1 / 8:1 / 1:8…).
+  Endpoints v1 mantenidos por compatibilidad. Para código nuevo, usa
+  <a href="/nano-banana">Nano Banana 2</a>.
 </p>
 
 <nav
@@ -35,24 +35,15 @@
   {/each}
 </nav>
 
-<a
-  href="/nano-banana/legacy"
-  class="legacy-link"
-  in:fade={{ duration: 400, delay: 1100 }}
-  out:fade={{ duration: 200 }}
->
-  → ver v1 (legacy)
-</a>
-
 <style>
-  .v-tag {
+  .legacy-tag {
     display: inline-block;
     margin-left: 0.5rem;
     padding: 0.15rem 0.55rem;
-    background: rgba(80, 200, 120, 0.18);
-    border: 1px solid rgba(80, 200, 120, 0.4);
+    background: rgba(180, 140, 60, 0.18);
+    border: 1px solid rgba(180, 140, 60, 0.4);
     border-radius: 999px;
-    color: rgb(140, 220, 170);
+    color: rgb(220, 180, 100);
     font-size: 0.55em;
     font-weight: 500;
     vertical-align: middle;
@@ -65,6 +56,13 @@
     color: var(--text-secondary);
     font-size: 0.9rem;
     line-height: 1.5;
+  }
+  .lede a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .lede a:hover {
+    text-decoration: underline;
   }
   .subnav {
     margin-top: 2rem;
@@ -82,18 +80,5 @@
     font-size: 0.72rem;
     color: var(--text-muted);
     font-weight: 400;
-  }
-  .legacy-link {
-    margin-top: 1.5rem;
-    padding: 0.45rem 0.95rem;
-    color: var(--text-muted);
-    text-decoration: none;
-    font-size: 0.82rem;
-    border-radius: var(--radius-pill);
-    transition: color var(--transition-fast), background var(--transition-fast);
-  }
-  .legacy-link:hover {
-    color: var(--text-secondary);
-    background: rgba(255, 255, 255, 0.04);
   }
 </style>

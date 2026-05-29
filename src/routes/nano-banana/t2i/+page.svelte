@@ -1,5 +1,5 @@
 <script lang="ts">
-  import NanoBananaT2I from '$lib/forms/NanoBananaT2I.svelte';
+  import NanoBanana2T2I from '$lib/forms/NanoBanana2T2I.svelte';
 </script>
 
-<NanoBananaT2I />
+<NanoBanana2T2I />
