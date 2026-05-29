@@ -6,7 +6,8 @@
 
   const modes = [
     { href: '/flux/2-pro', label: '2 Pro', hint: 'Text → Image' },
-    { href: '/flux/pulid', label: 'PuLID', hint: 'Identidad facial → Escena' }
+    { href: '/flux/pulid', label: 'PuLID', hint: 'Identidad facial → Escena' },
+    { href: '/flux/kontext', label: 'Kontext', hint: 'Image → Image (lookbooks)' }
   ];
 </script>
 
