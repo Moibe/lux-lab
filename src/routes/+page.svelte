@@ -12,7 +12,8 @@
     { href: '/hailuo-02', label: 'Hailuo-02', icon: '⚡' },
     { href: '/ltx-2.3', label: 'LTX-2.3', icon: '🎞️' },
     { href: '/omnihuman', label: 'Omnihuman', icon: '🗣️' },
-    { href: '/flux', label: 'Flux', icon: '🖼️' }
+    { href: '/flux', label: 'Flux', icon: '🖼️' },
+    { href: '/nano-banana', label: 'Nano Banana', icon: '🍌' }
   ];
 </script>
 
